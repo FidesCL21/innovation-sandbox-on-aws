@@ -4,6 +4,7 @@ import { Duration } from "aws-cdk-lib";
 import {
   Application,
   ConfigurationContent,
+  DeletionProtectionCheck,
   DeploymentStrategy,
   Environment,
   HostedConfiguration,
@@ -12,6 +13,7 @@ import { Construct } from "constructs";
 import path from "path";
 
 import { getSolutionContext } from "@amzn/innovation-sandbox-infrastructure/helpers/cdk-context";
+import { isDevMode } from "@amzn/innovation-sandbox-infrastructure/helpers/deployment-mode";
 
 export interface ConfigProps {
   namespace: string;
@@ -26,12 +28,16 @@ export class Config extends Construct {
   constructor(scope: Construct, id: string, props: ConfigProps) {
     super(scope, id);
 
+    const devMode = isDevMode(scope);
     this.application = new Application(this, "Application", {
       description: `AppConfig Application for Innovation Sandbox on AWS - ${props.namespace}`,
     });
     this.environment = new Environment(this, "Environment", {
       application: this.application,
       description: `AppConfig Environment for Innovation Sandbox on AWS - ${props.namespace}`,
+      deletionProtectionCheck: devMode
+        ? DeletionProtectionCheck.BYPASS
+        : undefined,
     });
 
     this.deploymentStrategy = new DeploymentStrategy(
@@ -59,6 +65,9 @@ export class Config extends Construct {
           path.join(__dirname, "global-config.yaml"),
           "application/x-yaml",
         ),
+        deletionProtectionCheck: devMode
+          ? DeletionProtectionCheck.BYPASS
+          : undefined,
       },
     );
 
@@ -75,6 +84,9 @@ export class Config extends Construct {
             path.join(__dirname, "nuke-config.yaml"),
           "application/x-yaml",
         ),
+        deletionProtectionCheck: devMode
+          ? DeletionProtectionCheck.BYPASS
+          : undefined,
       },
     );
   }

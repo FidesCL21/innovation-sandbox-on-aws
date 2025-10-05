@@ -79,6 +79,10 @@ export class IsbLambdaFunction<T extends z.ZodSchema<any>> extends Construct {
       ...extraAppConfigExtensionProps,
     };
 
+    const reservedConcurrentExecutions = isDevMode(scope)
+      ? undefined
+      : props.reservedConcurrentExecutions;
+
     this.lambdaFunction = new NodejsFunction(this, "Function", {
       functionName: `ISB-${id}-${props.namespace}`,
       role: functionRole,
@@ -90,6 +94,7 @@ export class IsbLambdaFunction<T extends z.ZodSchema<any>> extends Construct {
       loggingFormat: LoggingFormat.JSON,
       systemLogLevelV2: SystemLogLevel.INFO,
       ...props,
+      reservedConcurrentExecutions,
       bundling: {
         sourceMap: true,
         ...props.bundling,
