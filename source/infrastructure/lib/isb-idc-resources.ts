@@ -24,6 +24,7 @@ import { IdcConfig } from "@amzn/innovation-sandbox-shared-json-param-parser/src
 const supportedSchemas = ["1"];
 
 export interface IsbIdcResourcesProps {
+  orgMgtAccountId: string;
   hubAccountId: string;
   identityStoreId: string;
   ssoInstanceArn: string;
@@ -40,7 +41,7 @@ export class IsbIdcResources {
       service: "identitystore",
       resource: "identitystore",
       region: "",
-      account: "*",
+      account: props.orgMgtAccountId,
       arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
       resourceName: props.identityStoreId,
     });
@@ -74,6 +75,7 @@ export class IsbIdcResources {
     });
 
     const idcConfigurer = new IdcConfigurer(scope, "IdcConfigurer", {
+      orgMgtAccountId: props.orgMgtAccountId,
       namespace: props.namespace,
       ssoInstanceArn: props.ssoInstanceArn,
       identityStoreId: props.identityStoreId,

@@ -166,13 +166,18 @@ export class RestApi extends ApiGatewayRestApi {
               statement: {
                 ipSetReferenceStatement: {
                   arn: ipSet.attrArn,
+                  ipSetForwardedIpConfig: {
+                    headerName: "X-Forwarded-For",
+                    fallbackBehavior: "NO_MATCH",
+                    position: "FIRST",
+                  },
                 },
               },
             },
           },
           visibilityConfig: {
             cloudWatchMetricsEnabled: true,
-            metricName: "IsbRateLimitRuleMetric",
+            metricName: "IsbAllowListRuleMetric",
             sampledRequestsEnabled: true,
           },
         },
@@ -215,6 +220,9 @@ export class RestApi extends ApiGatewayRestApi {
               excludedRules: [
                 {
                   name: "SizeRestrictions_BODY",
+                },
+                {
+                  name: "SizeRestrictions_QUERYSTRING",
                 },
                 {
                   name: "CrossSiteScripting_BODY",
