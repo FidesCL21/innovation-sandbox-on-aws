@@ -91,11 +91,19 @@ export class CostExplorerService {
     granularity: Granularity,
     tag?: { tagName: string; tagValues: string[] },
   ): GetCostAndUsageCommandInput {
+    const exclusiveEnd = CostExplorerService.toStartOfNextPeriod(
+      end,
+      granularity,
+    );
+
     if (tag) {
       return {
         TimePeriod: {
           Start: CostExplorerService.toCostExplorerFormat(start, granularity),
-          End: CostExplorerService.toCostExplorerFormat(end, granularity),
+          End: CostExplorerService.toCostExplorerFormat(
+            exclusiveEnd,
+            granularity,
+          ),
         },
         Granularity: granularity,
         Metrics: ["UnblendedCost"],
@@ -133,11 +141,11 @@ export class CostExplorerService {
         ],
       };
     } else {
-      return {
-        TimePeriod: {
-          Start: CostExplorerService.toCostExplorerFormat(start, granularity),
-          End: CostExplorerService.toCostExplorerFormat(end, granularity),
-        },
+    return {
+      TimePeriod: {
+        Start: CostExplorerService.toCostExplorerFormat(start, granularity),
+        End: CostExplorerService.toCostExplorerFormat(exclusiveEnd, granularity),
+      },
         Granularity: granularity,
         Metrics: ["UnblendedCost"],
         Filter: {

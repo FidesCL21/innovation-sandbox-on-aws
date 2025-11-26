@@ -115,7 +115,7 @@ describe("CostExplorerService", () => {
       expect(result).toEqual({
         TimePeriod: {
           Start: "2024-01-01",
-          End: "2024-01-31",
+          End: "2024-02-01",
         },
         Granularity: Granularity.DAILY,
         Metrics: ["UnblendedCost"],

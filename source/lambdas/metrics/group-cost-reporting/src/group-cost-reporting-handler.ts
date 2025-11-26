@@ -31,8 +31,12 @@ import { Context, EventBridgeEvent } from "aws-lambda";
 import { backOff } from "exponential-backoff";
 import { DateTime } from "luxon";
 
+type ReportCadence = "monthly" | "daily";
+
 interface CostReportEvent {
   reportMonth?: string;
+  reportType?: ReportCadence;
+  reportDate?: string; // yyyy-MM-dd for daily overrides
 }
 
 interface RelevantLeaseData {
@@ -40,12 +44,26 @@ interface RelevantLeaseData {
   readonly awsAccountId: string;
   readonly startDate: DateTime;
   readonly endDate: DateTime;
+  readonly userEmail: string | undefined;
+}
+
+interface ReportContext {
+  readonly startDate: DateTime;
+  readonly endDate: DateTime;
+  readonly cadence: ReportCadence;
+  readonly storageYear: string;
+  readonly storageMonth: string;
+  readonly fileLabel: string;
+  readonly reportMonthLabel: string;
+  readonly shouldPublishEvents: boolean;
 }
 
 const GROUP_COST_REPORT_CONFIG = {
   DEFAULT_CURRENCY: "USD",
   STARTING_DELAY: 1000,
   MAX_ATTEMPTS: 5,
+  DEFAULT_GROUP_NAME: "No cost report group",
+  DEFAULT_USER_NAME: "Unknown user",
 };
 
 const serviceName = "GroupCostReporting";
@@ -63,7 +81,12 @@ export async function generateReport(
   _event: EventBridgeEvent<string, unknown>,
   context: Context & ValidatedEnvironment<GroupCostReportingLambdaEnvironment>,
 ) {
-  logger.debug(`Running last month's cost report on ${DateTime.now().toISO()}`);
+  const reportContext = getReportPeriod(
+    (_event as Record<string, unknown>)?.detail ?? _event,
+  );
+  logger.debug(
+    `Running ${reportContext.cadence} cost report for ${reportContext.fileLabel} on ${DateTime.now().toISO()}`,
+  );
   const eventBridgeClient = IsbServices.isbEventBridge(context.env);
   const leaseStore = IsbServices.leaseStore(context.env);
   const costExplorerService = IsbServices.costExplorer(
@@ -73,13 +96,13 @@ export async function generateReport(
   const s3Client = IsbClients.s3({
     USER_AGENT_EXTRA: context.env.USER_AGENT_EXTRA,
   });
-  const { startOfMonth, endOfMonth } = getReportPeriod(_event.detail);
+  const { startDate, endDate } = reportContext;
 
   try {
     const leases = await fetchRelevantLeases(
       leaseStore,
-      startOfMonth,
-      endOfMonth,
+      startDate,
+      endDate,
     );
 
     const uniqueAccountIds = [
@@ -88,39 +111,64 @@ export async function generateReport(
     const dailyCostsByAccount =
       await costExplorerService.getDailyCostsByAccount(
         uniqueAccountIds,
-        startOfMonth,
-        endOfMonth,
+        startDate,
+        endDate,
       );
 
     const costReportGroupTotals = calculateCostsByGroup(
       leases,
       dailyCostsByAccount,
     );
+    const userCostTotals = calculateCostsByUser(leases, dailyCostsByAccount);
 
-    const fileName = await uploadReportToS3(
-      s3Client,
+    const costGroupCsv = generateCSV(
       costReportGroupTotals,
-      startOfMonth,
-      endOfMonth,
+      "CostReportGroup",
+      startDate,
+      endDate,
       GROUP_COST_REPORT_CONFIG.DEFAULT_CURRENCY,
-      context.env.REPORT_BUCKET_NAME,
+    );
+    const userCostCsv = generateCSV(
+      userCostTotals,
+      "UserEmail",
+      startDate,
+      endDate,
+      GROUP_COST_REPORT_CONFIG.DEFAULT_CURRENCY,
     );
 
-    await eventBridgeClient.sendIsbEvent(
-      tracer,
-      new GroupCostReportGeneratedEvent({
-        reportMonth: startOfMonth.toFormat("yyyy-MM"),
-        fileName: fileName,
-        bucketName: context.env.REPORT_BUCKET_NAME,
-        timestamp: DateTime.now().toISO(),
-      }),
-    );
+    const costGroupFileName = await uploadReportToS3({
+      s3Client,
+      bucketName: context.env.REPORT_BUCKET_NAME,
+      csvBody: costGroupCsv,
+      reportContext,
+      dimension: "cost-groups",
+    });
+
+    await uploadReportToS3({
+      s3Client,
+      bucketName: context.env.REPORT_BUCKET_NAME,
+      csvBody: userCostCsv,
+      reportContext,
+      dimension: "users",
+    });
+
+    if (reportContext.shouldPublishEvents) {
+      await eventBridgeClient.sendIsbEvent(
+        tracer,
+        new GroupCostReportGeneratedEvent({
+          reportMonth: reportContext.reportMonthLabel,
+          fileName: costGroupFileName,
+          bucketName: context.env.REPORT_BUCKET_NAME,
+          timestamp: DateTime.now().toISO(),
+        }),
+      );
+    }
   } catch (error) {
     logger.error("Cost report generation failed", {
-      reportMonth: startOfMonth.toFormat("yyyy-MM"),
+      reportMonth: reportContext.reportMonthLabel,
       reportPeriod: {
-        start: startOfMonth.toISO(),
-        end: endOfMonth.toISO(),
+        start: startDate.toISO(),
+        end: endDate.toISO(),
       },
       bucketName: context.env.REPORT_BUCKET_NAME,
       error:
@@ -133,14 +181,16 @@ export async function generateReport(
           : error,
     });
 
-    await eventBridgeClient.sendIsbEvent(
-      tracer,
-      new GroupCostReportGeneratedFailureEvent({
-        reportMonth: startOfMonth.toFormat("yyyy-MM"),
-        timestamp: DateTime.now().toISO(),
-        logName: context.logGroupName,
-      }),
-    );
+    if (reportContext.shouldPublishEvents) {
+      await eventBridgeClient.sendIsbEvent(
+        tracer,
+        new GroupCostReportGeneratedFailureEvent({
+          reportMonth: reportContext.reportMonthLabel,
+          timestamp: DateTime.now().toISO(),
+          logName: context.logGroupName,
+        }),
+      );
+    }
     throw error;
   }
 }
@@ -199,6 +249,7 @@ async function fetchRelevantLeases(
       awsAccountId: lease.awsAccountId,
       startDate: DateTime.fromISO(lease.startDate),
       endDate: isExpiredLease(lease) ? DateTime.fromISO(lease.endDate) : now(),
+      userEmail: lease.userEmail,
     }));
 }
 
@@ -218,18 +269,36 @@ function calculateCostsByGroup(
   relevantLeaseData: RelevantLeaseData[],
   dailyCostsByAccount: Record<string, Record<string, number>>,
 ) {
-  const costReportGroupTotals = relevantLeaseData.reduce(
-    (totals, lease) => {
-      const leaseTotalCost = calculateLeaseCost(lease, dailyCostsByAccount);
-      const groupName = lease.costReportGroup ?? "No cost report group";
-
-      totals[groupName] = (totals[groupName] || 0) + leaseTotalCost;
-      return totals;
-    },
-    {} as Record<string, number>,
+  return calculateCostsByKey(
+    relevantLeaseData,
+    dailyCostsByAccount,
+    (lease) =>
+      lease.costReportGroup ?? GROUP_COST_REPORT_CONFIG.DEFAULT_GROUP_NAME,
   );
+}
 
-  return costReportGroupTotals;
+function calculateCostsByUser(
+  relevantLeaseData: RelevantLeaseData[],
+  dailyCostsByAccount: Record<string, Record<string, number>>,
+) {
+  return calculateCostsByKey(
+    relevantLeaseData,
+    dailyCostsByAccount,
+    (lease) => lease.userEmail ?? GROUP_COST_REPORT_CONFIG.DEFAULT_USER_NAME,
+  );
+}
+
+function calculateCostsByKey(
+  relevantLeaseData: RelevantLeaseData[],
+  dailyCostsByAccount: Record<string, Record<string, number>>,
+  keySelector: (lease: RelevantLeaseData) => string,
+) {
+  return relevantLeaseData.reduce((totals, lease) => {
+    const leaseTotalCost = calculateLeaseCost(lease, dailyCostsByAccount);
+    const key = keySelector(lease);
+    totals[key] = (totals[key] || 0) + leaseTotalCost;
+    return totals;
+  }, {} as Record<string, number>);
 }
 
 function calculateLeaseCost(
@@ -248,29 +317,35 @@ function calculateLeaseCost(
   return leaseTotalCost;
 }
 
-async function uploadReportToS3(
-  s3Client: S3Client,
-  costReportGroupTotals: Record<string, number>,
-  startOfLastMonth: DateTime,
-  endOfLastMonth: DateTime,
-  currency: string,
-  bucketName: string,
-) {
-  const costReportCSV = generateCSV(
-    costReportGroupTotals,
-    startOfLastMonth,
-    endOfLastMonth,
-    currency,
-  );
+interface UploadParams {
+  s3Client: S3Client;
+  bucketName: string;
+  csvBody: string;
+  reportContext: ReportContext;
+  dimension: "cost-groups" | "users";
+}
 
-  const fileName = `${startOfLastMonth.toFormat("yyyy")}/${startOfLastMonth.toFormat("MM")}/cost-report-${now().toFormat("yyyyMMdd-HHmmss")}.csv`;
+async function uploadReportToS3({
+  s3Client,
+  bucketName,
+  csvBody,
+  reportContext,
+  dimension,
+}: UploadParams) {
+  const basePrefix = `reports/${reportContext.storageYear}/${reportContext.storageMonth}/${dimension}/${reportContext.cadence}`;
+  const fileName =
+    reportContext.cadence === "daily"
+      ? `${basePrefix}/${reportContext.fileLabel}.csv`
+      : `${basePrefix}/cost-report-${reportContext.fileLabel}.csv`;
 
   const s3PutCommand = new PutObjectCommand({
     Bucket: bucketName,
     Key: fileName,
-    Body: costReportCSV,
+    Body: csvBody,
     ContentType: "text/csv",
-    ContentDisposition: `attachment; filename="${fileName.split("/").pop()}"`,
+    ContentDisposition: `attachment; filename="${fileName.split(
+      "/",
+    ).pop()}"`,
   });
 
   await s3Client.send(s3PutCommand);
@@ -278,44 +353,82 @@ async function uploadReportToS3(
 }
 
 function generateCSV(
-  costReportGroupTotals: Record<string, number>,
-  startOfLastMonth: DateTime,
-  endOfLastMonth: DateTime,
+  costTotals: Record<string, number>,
+  primaryColumnHeader: string,
+  startDate: DateTime,
+  endDate: DateTime,
   currency: string,
 ): string {
   const headers = [
-    "CostReportGroup",
+    primaryColumnHeader,
     "StartDate",
     "EndDate",
     "Cost",
     "Currency",
   ];
 
-  const rows = Object.entries(costReportGroupTotals).map(([group, cost]) => [
-    group,
-    startOfLastMonth.toFormat("yyyy-MM-dd"),
-    endOfLastMonth.toFormat("yyyy-MM-dd"),
+  const rows = Object.entries(costTotals).map(([primaryValue, cost]) => [
+    primaryValue,
+    startDate.toFormat("yyyy-MM-dd"),
+    endDate.toFormat("yyyy-MM-dd"),
     cost.toFixed(2),
     currency,
   ]);
   return [headers, ...rows].map((row) => row.join(",")).join("\n");
 }
 
-//this allows user to manually invoke lambda with custom month on the AWS console
-function getReportPeriod(eventDetail: unknown) {
-  const event = eventDetail as CostReportEvent;
-  if (event && event.reportMonth) {
-    const targetDate = DateTime.fromFormat(event.reportMonth, "yyyy-MM");
-    if (targetDate.isValid) {
-      return {
-        startOfMonth: targetDate.startOf("month"),
-        endOfMonth: targetDate.endOf("month"),
-      };
+// determines if we should run a monthly summary (default) or a daily incremental report
+function getReportPeriod(eventDetail: unknown): ReportContext {
+  const event = eventDetail as CostReportEvent | undefined;
+  if (event?.reportType === "daily") {
+    return buildDailyReportContext(event);
+  }
+  return buildMonthlyReportContext(event);
+}
+
+function buildDailyReportContext(event: CostReportEvent | undefined): ReportContext {
+  let targetDate = now().minus({ days: 1 });
+  if (event?.reportDate) {
+    const parsed = DateTime.fromISO(event.reportDate);
+    if (parsed.isValid) {
+      targetDate = parsed;
+    }
+  }
+  const startDate = targetDate.startOf("day");
+  const endDate = targetDate.endOf("day");
+
+  return {
+    startDate,
+    endDate,
+    cadence: "daily",
+    storageYear: startDate.toFormat("yyyy"),
+    storageMonth: startDate.toFormat("MM"),
+    fileLabel: startDate.toFormat("yyyy-MM-dd"),
+    reportMonthLabel: startDate.toFormat("yyyy-MM"),
+    shouldPublishEvents: false,
+  };
+}
+
+function buildMonthlyReportContext(event: CostReportEvent | undefined): ReportContext {
+  let targetDate = now().minus({ months: 1 });
+  if (event?.reportMonth) {
+    const parsed = DateTime.fromFormat(event.reportMonth, "yyyy-MM");
+    if (parsed.isValid) {
+      targetDate = parsed;
     }
   }
 
+  const startDate = targetDate.startOf("month");
+  const endDate = targetDate.endOf("month");
+
   return {
-    startOfMonth: now().minus({ months: 1 }).startOf("month"),
-    endOfMonth: now().minus({ months: 1 }).endOf("month"),
+    startDate,
+    endDate,
+    cadence: "monthly",
+    storageYear: startDate.toFormat("yyyy"),
+    storageMonth: startDate.toFormat("MM"),
+    fileLabel: startDate.toFormat("yyyy-MM"),
+    reportMonthLabel: startDate.toFormat("yyyy-MM"),
+    shouldPublishEvents: true,
   };
 }

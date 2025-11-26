@@ -119,8 +119,8 @@ export class GroupCostReportingLambda extends Construct {
 
     groupCostReportingLambda.lambdaFunction.grantInvoke(role);
 
-    new CfnSchedule(scope, "GroupCostReportingScheduledEvent", {
-      description: "triggers Cost Monitoring on the fifth day of every month",
+    new CfnSchedule(scope, "GroupCostReportingMonthlySchedule", {
+      description: "Triggers the monthly cost report on the 2nd day of every month",
       scheduleExpression: "cron(25 1 2 * ? *)", // Runs at 01:25 UTC on the 2nd of every month
       flexibleTimeWindow: {
         mode: "FLEXIBLE",
@@ -132,6 +132,30 @@ export class GroupCostReportingLambda extends Construct {
         },
         arn: groupCostReportingLambda.lambdaFunction.functionArn,
         roleArn: role.roleArn,
+        input: JSON.stringify({
+          reportType: "monthly",
+        }),
+        deadLetterConfig: {
+          arn: dlq.queueArn,
+        },
+      },
+    });
+
+    new CfnSchedule(scope, "GroupCostReportingDailySchedule", {
+      description: "Triggers the daily incremental cost report at 00:00 UTC",
+      scheduleExpression: "cron(0 0 * * ? *)",
+      flexibleTimeWindow: {
+        mode: "OFF",
+      },
+      target: {
+        retryPolicy: {
+          maximumRetryAttempts: 3,
+        },
+        arn: groupCostReportingLambda.lambdaFunction.functionArn,
+        roleArn: role.roleArn,
+        input: JSON.stringify({
+          reportType: "daily",
+        }),
         deadLetterConfig: {
           arn: dlq.queueArn,
         },
