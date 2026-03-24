@@ -547,7 +547,7 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                     {
                       "Ref": "AWS::Partition",
                     },
-                    ":identitystore::",
+                    ":identitystore::*:identitystore/",
                     {
                       "Ref": "OrgMgtAccountId",
                     },
@@ -560,7 +560,11 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
               },
             },
             {
-              "Action": "identitystore:GetGroupId",
+              "Action": [
+                "identitystore:GetUserId",
+                "identitystore:DescribeUser",
+                "identitystore:ListUsers",
+              ],
               "Effect": "Allow",
               "Resource": [
                 {
@@ -571,11 +575,48 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                       {
                         "Ref": "AWS::Partition",
                       },
-                      ":identitystore::",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
                       {
                         "Ref": "OrgMgtAccountId",
                       },
-                      ":identitystore/",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/user/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "identitystore:ListGroupMemberships",
+                "identitystore:ListGroupMembershipsForMember",
+                "identitystore:DescribeGroupMembership",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":identitystore::*:identitystore/",
                       {
                         "Ref": "IdentityStoreId",
                       },
@@ -590,11 +631,52 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                       {
                         "Ref": "AWS::Partition",
                       },
-                      ":identitystore:::group/*",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/group/*",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/membership/*",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/user/*",
                     ],
                   ],
                 },
               ],
+            },
+            {
+              "Action": "sso-admin:ListInstances",
+              "Effect": "Allow",
+              "Resource": "*",
             },
             {
               "Action": [
@@ -1053,7 +1135,11 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                       {
                         "Ref": "AWS::Partition",
                       },
-                      ":identitystore:::user/*",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/user/*",
                     ],
                   ],
                 },
@@ -1090,7 +1176,11 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                       {
                         "Ref": "AWS::Partition",
                       },
-                      ":identitystore:::group/*",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/group/*",
                     ],
                   ],
                 },
@@ -1130,7 +1220,11 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                       {
                         "Ref": "AWS::Partition",
                       },
-                      ":identitystore:::group/*",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/group/*",
                     ],
                   ],
                 },
@@ -1142,7 +1236,11 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                       {
                         "Ref": "AWS::Partition",
                       },
-                      ":identitystore:::membership/*",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/membership/*",
                     ],
                   ],
                 },
@@ -1154,7 +1252,11 @@ exports[`IdcStack Snapshot > matches the snapshot 1`] = `
                       {
                         "Ref": "AWS::Partition",
                       },
-                      ":identitystore:::user/*",
+                      ":identitystore::*:identitystore/",
+                      {
+                        "Ref": "IdentityStoreId",
+                      },
+                      "/user/*",
                     ],
                   ],
                 },
@@ -13676,6 +13778,12 @@ phases:
                     },
                     {
                       "Fn::GetAtt": [
+                        "LeaseCollaboratorAssignmentFunctionRole3ECACF51",
+                        "Arn",
+                      ],
+                    },
+                    {
+                      "Fn::GetAtt": [
                         "EmailNotificationFunctionRoleB4E00EDD",
                         "Arn",
                       ],
@@ -19883,6 +19991,430 @@ phases:
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "LeaseCollaboratorAssignmentFunctionAllowEventBridgeToTriggerLambdaE7AAE151": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "LeaseCollaboratorAssignmentFunctionB7B5E0E1",
+            "Arn",
+          ],
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "ISBEventBusD5514129",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
+    "LeaseCollaboratorAssignmentFunctionB7B5E0E1": {
+      "DependsOn": [
+        "LeaseCollaboratorAssignmentFunctionRoleDefaultPolicyE5998B48",
+        "LeaseCollaboratorAssignmentFunctionRole3ECACF51",
+      ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
+      "Properties": {
+        "Architectures": [
+          "arm64",
+        ],
+        "Code": "Omitted to remove snapshot dependency on hash",
+        "Description": "Assigns requested collaborators to leases when approvals are processed",
+        "Environment": {
+          "Variables": {
+            "AWS_XRAY_CONTEXT_MISSING": "IGNORE_ERROR",
+            "IDC_ROLE_ARN": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition",
+                  },
+                  ":iam::",
+                  {
+                    "Ref": "IdcAccountId",
+                  },
+                  ":role/InnovationSandbox-",
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "-IdcRole",
+                ],
+              ],
+            },
+            "INTERMEDIATE_ROLE_ARN": {
+              "Fn::GetAtt": [
+                "IntermediateRole6D2F2036",
+                "Arn",
+              ],
+            },
+            "ISB_NAMESPACE": {
+              "Ref": "Namespace",
+            },
+            "LEASE_TABLE_NAME": {
+              "Fn::GetAtt": [
+                "IsbSpokeConfigJsonParamResolverParseJsonConfigurationIsbCustomResource57F98B57",
+                "leaseTable",
+              ],
+            },
+            "NODE_OPTIONS": "--enable-source-maps",
+            "POWERTOOLS_LOG_LEVEL": {
+              "Fn::FindInMap": [
+                "Mapping",
+                "context",
+                "logLevel",
+                {
+                  "DefaultValue": "",
+                },
+              ],
+            },
+            "POWERTOOLS_SERVICE_NAME": "innovation-sandbox",
+            "USER_AGENT_EXTRA": "AwsSolution/SO0284/v1.0.4",
+          },
+        },
+        "FunctionName": {
+          "Fn::Join": [
+            "",
+            [
+              "ISB-LeaseCollaboratorAssignment-",
+              {
+                "Ref": "Namespace",
+              },
+            ],
+          ],
+        },
+        "Handler": "index.handler",
+        "Layers": [
+          {
+            "Ref": "IsbSpokeConfigJsonParamResolverISBLambdaLayerIsbComputeStackDependenciesLayerVersion5B4AA878",
+          },
+          {
+            "Ref": "IsbSpokeConfigJsonParamResolverISBLambdaLayerIsbComputeStackCommonLayerVersion27C21445",
+          },
+        ],
+        "LoggingConfig": {
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "ISBLogGroupE607F9A7",
+          },
+          "SystemLogLevel": "INFO",
+        },
+        "MemorySize": 1024,
+        "ReservedConcurrentExecutions": 1,
+        "Role": {
+          "Fn::GetAtt": [
+            "LeaseCollaboratorAssignmentFunctionRole3ECACF51",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Tags": [
+          {
+            "Key": "aws-solutions:isb-id",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "_isb",
+                ],
+              ],
+            },
+          },
+        ],
+        "Timeout": 120,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "LeaseCollaboratorAssignmentFunctionRole3ECACF51": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Tags": [
+          {
+            "Key": "aws-solutions:isb-id",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "_isb",
+                ],
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "LeaseCollaboratorAssignmentFunctionRoleDefaultPolicyE5998B48": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ISBLogGroupE607F9A7",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "IntermediateRole6D2F2036",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "ssm:GetParameter",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":ssm:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "IdcAccountId",
+                    },
+                    ":parameter/InnovationSandbox_",
+                    {
+                      "Ref": "Namespace",
+                    },
+                    "_Idc_Configuration",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "LeaseCollaboratorAssignmentFunctionRoleDefaultPolicyE5998B48",
+        "Roles": [
+          {
+            "Ref": "LeaseCollaboratorAssignmentFunctionRole3ECACF51",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "LeaseCollaboratorAssignmentIsbDbTableReadOnly6B8356FD": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
+                "dynamodb:BatchGetItem",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":dynamodb:",
+                      {
+                        "Ref": "AWS::Region",
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":table/",
+                      {
+                        "Fn::GetAtt": [
+                          "IsbSpokeConfigJsonParamResolverParseJsonConfigurationIsbCustomResource57F98B57",
+                          "leaseTable",
+                        ],
+                      },
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":dynamodb:",
+                      {
+                        "Ref": "AWS::Region",
+                      },
+                      ":",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":table/",
+                      {
+                        "Fn::GetAtt": [
+                          "IsbSpokeConfigJsonParamResolverParseJsonConfigurationIsbCustomResource57F98B57",
+                          "leaseTable",
+                        ],
+                      },
+                      "/index/*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": [
+                "kms:Decrypt",
+                "kms:DescribeKey",
+                "kms:Encrypt",
+                "kms:GenerateDataKey",
+                "kms:ReEncrypt*",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":kms:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":key/",
+                    {
+                      "Fn::GetAtt": [
+                        "IsbSpokeConfigJsonParamResolverParseJsonConfigurationIsbCustomResource57F98B57",
+                        "tableKmsKeyId",
+                      ],
+                    },
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "DynamoDBReadOnlyAccess",
+        "Roles": [
+          {
+            "Ref": "LeaseCollaboratorAssignmentFunctionRole3ECACF51",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "LeaseCollaboratorAssignmentLeaseCollaboratorAssignmentsEmailEventsToLambda94188B3A": {
+      "Properties": {
+        "Description": "Assigns collaborators when leases are approved",
+        "EventBusName": {
+          "Ref": "ISBEventBusD5514129",
+        },
+        "EventPattern": {
+          "detail-type": [
+            "LeaseApproved",
+          ],
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "LeaseCollaboratorAssignmentFunctionB7B5E0E1",
+                "Arn",
+              ],
+            },
+            "Id": "Target0",
+            "RetryPolicy": {
+              "MaximumEventAgeInSeconds": 21600,
+              "MaximumRetryAttempts": 3,
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
+    },
+    "LeaseCollaboratorAssignmentLeaseCollaboratorAssignmentsEmailEventsToLambdaAllowEventRuleIsbComputeStackLeaseCollaboratorAssignmentFunction66B1A4D9DB7A8D6A": {
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "LeaseCollaboratorAssignmentFunctionB7B5E0E1",
+            "Arn",
+          ],
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "LeaseCollaboratorAssignmentLeaseCollaboratorAssignmentsEmailEventsToLambda94188B3A",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
     },
     "LeaseMonitoringFunctionA656342F": {
       "DependsOn": [

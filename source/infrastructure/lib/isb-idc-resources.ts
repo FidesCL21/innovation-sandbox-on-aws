@@ -47,6 +47,33 @@ export class IsbIdcResources {
     });
     const instanceId = Fn.select(1, Fn.split("/", props.ssoInstanceArn));
 
+    const identityStoreGroupArn = Stack.of(scope).formatArn({
+      service: "identitystore",
+      resource: "identitystore",
+      region: "",
+      account: "*",
+      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
+      resourceName: `${props.identityStoreId}/group/*`,
+    });
+
+    const identityStoreMembershipArn = Stack.of(scope).formatArn({
+      service: "identitystore",
+      resource: "identitystore",
+      region: "",
+      account: "*",
+      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
+      resourceName: `${props.identityStoreId}/membership/*`,
+    });
+
+    const identityStoreUserArn = Stack.of(scope).formatArn({
+      service: "identitystore",
+      resource: "identitystore",
+      region: "",
+      account: "*",
+      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
+      resourceName: `${props.identityStoreId}/user/*`,
+    });
+
     const idcConfigurer = new IdcConfigurer(scope, "IdcConfigurer", {
       orgMgtAccountId: props.orgMgtAccountId,
       namespace: props.namespace,
@@ -84,14 +111,7 @@ export class IsbIdcResources {
             actions: ["identitystore:GetUserId", "identitystore:DescribeUser"],
             resources: [
               identityStoreArn,
-              Stack.of(scope).formatArn({
-                service: "identitystore",
-                region: "",
-                account: "",
-                resource: "user",
-                arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-                resourceName: "*",
-              }),
+              identityStoreUserArn,
             ],
           }),
           new PolicyStatement({
@@ -99,14 +119,7 @@ export class IsbIdcResources {
             actions: ["identitystore:ListGroups"],
             resources: [
               identityStoreArn,
-              Stack.of(scope).formatArn({
-                service: "identitystore",
-                region: "",
-                account: "",
-                resource: "group",
-                arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-                resourceName: "*",
-              }),
+              identityStoreGroupArn,
             ],
           }),
           new PolicyStatement({
@@ -117,30 +130,9 @@ export class IsbIdcResources {
             ],
             resources: [
               identityStoreArn,
-              Stack.of(scope).formatArn({
-                service: "identitystore",
-                region: "",
-                account: "",
-                resource: "group",
-                arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-                resourceName: "*",
-              }),
-              Stack.of(scope).formatArn({
-                service: "identitystore",
-                region: "",
-                account: "",
-                resource: "membership",
-                arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-                resourceName: "*",
-              }),
-              Stack.of(scope).formatArn({
-                service: "identitystore",
-                region: "",
-                account: "",
-                resource: "user",
-                arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-                resourceName: "*",
-              }),
+              identityStoreGroupArn,
+              identityStoreMembershipArn,
+              identityStoreUserArn,
             ],
           }),
           new PolicyStatement({

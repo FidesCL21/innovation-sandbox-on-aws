@@ -1,0 +1,11 @@
+{
+  "name": "@amzn/innovation-sandbox-lease-collaborator-assignment",
+  "description": "Lease collaborator assignment listener - Innovation Sandbox on AWS (SO0284)",
+  "version": "1.0.4",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "type": "module",
+  "license": "Apache-2.0"
+}

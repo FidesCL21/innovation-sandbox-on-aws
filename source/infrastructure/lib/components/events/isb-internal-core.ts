@@ -14,6 +14,7 @@ import { Construct } from "constructs";
 import { AccountDriftMonitoringLambda } from "@amzn/innovation-sandbox-infrastructure/components/account-management/account-drift-monitoring-lambda";
 import { AccountLifecycleManagementLambda } from "@amzn/innovation-sandbox-infrastructure/components/account-management/account-lifecycle-management-lambda";
 import { LeaseMonitoringLambda } from "@amzn/innovation-sandbox-infrastructure/components/account-management/lease-monitoring-lambda";
+import { LeaseCollaboratorAssignmentLambda } from "@amzn/innovation-sandbox-infrastructure/components/account-management/lease-collaborator-assignment-lambda";
 import { EmailNotificationLambda } from "@amzn/innovation-sandbox-infrastructure/components/notification/email-notification";
 import { IsbComputeResources } from "@amzn/innovation-sandbox-infrastructure/isb-compute-resources";
 
@@ -33,6 +34,7 @@ export class IsbInternalCore {
   readonly leaseMonitoringLambda;
   readonly accountLifecycleManagementLambda;
   readonly accountDriftMonitoringLambda;
+  readonly leaseCollaboratorAssignmentLambda;
 
   constructor(scope: Construct, props: IsbEventBackplaneProps) {
     this.eventBus = new EventBus(scope, "ISBEventBus", {
@@ -117,6 +119,13 @@ export class IsbInternalCore {
         orgMgtAccountId: props.orgMgtAccountId,
       },
     );
+
+    this.leaseCollaboratorAssignmentLambda =
+      new LeaseCollaboratorAssignmentLambda(scope, "LeaseCollaboratorAssignment", {
+        namespace: props.namespace,
+        idcAccountId: props.idcAccountId,
+        eventBus: this.eventBus,
+      });
 
     new EmailNotificationLambda(scope, "EmailNotification", {
       isbEventBus: this.eventBus,
