@@ -5,7 +5,6 @@ import { Construct } from "constructs";
 import path from "path";
 
 import { LeaseCollaboratorLambdaEnvironmentSchema } from "@amzn/innovation-sandbox-commons/lambda/environments/lease-collaborator-lambda-environment.js";
-import { sharedIdcSsmParamName } from "@amzn/innovation-sandbox-commons/types/isb-types";
 import { EventsToLambda } from "@amzn/innovation-sandbox-infrastructure/components/events-to-lambda";
 import { IsbLambdaFunction } from "@amzn/innovation-sandbox-infrastructure/components/isb-lambda-function";
 import {
@@ -61,6 +60,8 @@ export class LeaseCollaboratorAssignmentLambda extends Construct {
           props.namespace,
           props.idcAccountId,
         ),
+        IDC_CONFIG_PARAM_ARN:
+          IsbComputeStack.sharedSpokeConfig.parameterArns.idcConfigParamArn,
       },
       reservedConcurrentExecutions: 1,
       timeout: Duration.minutes(2),
@@ -76,8 +77,7 @@ export class LeaseCollaboratorAssignmentLambda extends Construct {
     );
     grantIsbSsmParameterRead(
       lambdaRole,
-      sharedIdcSsmParamName(props.namespace),
-      props.idcAccountId,
+      IsbComputeStack.sharedSpokeConfig.parameterArns.idcConfigParamArn,
     );
 
     new EventsToLambda(this, "LeaseCollaboratorAssignments", {

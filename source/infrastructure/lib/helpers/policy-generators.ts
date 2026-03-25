@@ -82,12 +82,25 @@ export function grantIsbAppConfigRead(
   );
 }
 
-export function grantIsbSsmParameterRead(role: Role, parameterArn: string) {
+export function grantIsbSsmParameterRead(
+  role: Role,
+  parameterNameOrArn: string,
+  accountId?: string,
+) {
+  const resourceArn = parameterNameOrArn.startsWith("arn:")
+    ? parameterNameOrArn
+    : Stack.of(role).formatArn({
+        service: "ssm",
+        account: accountId,
+        resource: "parameter",
+        resourceName: parameterNameOrArn,
+      });
+
   role.addToPolicy(
     new PolicyStatement({
       effect: Effect.ALLOW,
       actions: ["ssm:GetParameter"],
-      resources: [parameterArn],
+      resources: [resourceArn],
     }),
   );
 }

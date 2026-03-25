@@ -75,38 +75,13 @@ export class IdcConfigurer extends Construct {
       "userPermissionSetArn",
     );
 
-    const stack = Stack.of(scope);
-    const identityStoreArn = stack.formatArn({
+    const identityStoreArn = Stack.of(scope).formatArn({
       service: "identitystore",
       resource: "identitystore",
       region: "",
       account: props.orgMgtAccountId,
       arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
       resourceName: props.identityStoreId,
-    });
-    const identityStoreGroupArn = stack.formatArn({
-      service: "identitystore",
-      resource: "identitystore",
-      region: "",
-      account: "*",
-      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-      resourceName: `${props.identityStoreId}/group/*`,
-    });
-    const identityStoreMembershipArn = stack.formatArn({
-      service: "identitystore",
-      resource: "identitystore",
-      region: "",
-      account: "*",
-      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-      resourceName: `${props.identityStoreId}/membership/*`,
-    });
-    const identityStoreUserArn = stack.formatArn({
-      service: "identitystore",
-      resource: "identitystore",
-      region: "",
-      account: "*",
-      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
-      resourceName: `${props.identityStoreId}/user/*`,
     });
 
     lambdaFunction.addToRolePolicy(
@@ -118,46 +93,18 @@ export class IdcConfigurer extends Construct {
 
     lambdaFunction.addToRolePolicy(
       new PolicyStatement({
-        actions: [
-          "identitystore:GetGroupId",
-          "identitystore:DescribeGroup",
-          "identitystore:ListGroups",
-        ],
-        resources: [identityStoreArn, identityStoreGroupArn],
-      }),
-    );
-
-    lambdaFunction.addToRolePolicy(
-      new PolicyStatement({
-        actions: [
-          "identitystore:GetUserId",
-          "identitystore:DescribeUser",
-          "identitystore:ListUsers",
-        ],
-        resources: [identityStoreArn, identityStoreUserArn],
-      }),
-    );
-
-    lambdaFunction.addToRolePolicy(
-      new PolicyStatement({
-        actions: [
-          "identitystore:ListGroupMemberships",
-          "identitystore:ListGroupMembershipsForMember",
-          "identitystore:DescribeGroupMembership",
-        ],
+        actions: ["identitystore:GetGroupId"],
         resources: [
           identityStoreArn,
-          identityStoreGroupArn,
-          identityStoreMembershipArn,
-          identityStoreUserArn,
+          Stack.of(scope).formatArn({
+            service: "identitystore",
+            region: "",
+            account: "",
+            resource: "group",
+            arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
+            resourceName: "*",
+          }),
         ],
-      }),
-    );
-
-    lambdaFunction.addToRolePolicy(
-      new PolicyStatement({
-        actions: ["sso-admin:ListInstances"],
-        resources: ["*"],
       }),
     );
 

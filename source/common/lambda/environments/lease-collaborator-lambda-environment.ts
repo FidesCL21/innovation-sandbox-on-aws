@@ -7,6 +7,7 @@ export const LeaseCollaboratorLambdaEnvironmentSchema =
     ISB_NAMESPACE: z.string(),
     INTERMEDIATE_ROLE_ARN: z.string(),
     IDC_ROLE_ARN: z.string(),
+    IDC_CONFIG_PARAM_ARN: z.string(),
     LEASE_TABLE_NAME: z.string(),
     DEFAULT_PERMISSION_SET_ARN: z.string().optional(),
   });
